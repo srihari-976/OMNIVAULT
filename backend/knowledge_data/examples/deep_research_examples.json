@@ -1,0 +1,20 @@
+{
+    "examples": [
+        {
+            "query": "What are the latest advancements in quantum computing?",
+            "output": "🔬 DEEP RESEARCH: Quantum Computing Advancements\n\n**Executive Summary:**\nQuantum computing has seen significant breakthroughs in error correction, qubit coherence, and practical applications across multiple domains.\n\n**Key Findings:**\n\n1. **Error Correction Advances**\n   • Surface code implementations showing improved error rates\n   • Google's quantum error correction milestone in 2023\n   • IBM's quantum error mitigation techniques\n\n2. **Hardware Developments**\n   • Increased qubit counts (IBM's 433-qubit Osprey processor)\n   • Improved coherence times (>100 microseconds)\n   • Development of topological qubits\n\n3. **Practical Applications**\n   • Drug discovery and molecular simulation\n   • Cryptography and security protocols\n   • Optimization problems in logistics\n   • Financial modeling\n\n4. **Industry Progress**\n   • Microsoft's Azure Quantum platform expansion\n   • Amazon Braket cloud quantum computing\n   • Startups achieving significant funding\n\n**Challenges:**\n• Scaling while maintaining coherence\n• Temperature requirements (near absolute zero)\n• High costs and specialized infrastructure\n\n**Conclusion:**\nWhile still in early stages, quantum computing is progressing from research to practical applications, with major tech companies investing heavily in development."
+        },
+        {
+            "query": "How does photosynthesis work and what are its ecological implications?",
+            "output": "🌿 DEEP RESEARCH: Photosynthesis and Ecological Impact\n\n**Research Overview:**\nComprehensive analysis of photosynthetic processes and their broader environmental significance.\n\n**Photosynthesis Mechanism:**\n\n1. **Light-Dependent Reactions**\n   • Occur in thylakoid membranes\n   • Chlorophyll absorbs light energy\n   • Water molecules split, releasing O₂\n   • ATP and NADPH produced\n\n2. **Calvin Cycle (Light-Independent)**\n   • CO₂ fixation via RuBisCO enzyme\n   • Produces glucose (C₆H₁₂O₆)\n   • Occurs in stroma\n\n**Ecological Implications:**\n\n1. **Oxygen Production**\n   • 50-80% of Earth's oxygen from ocean phytoplankton\n   • Maintains atmospheric composition\n\n2. **Carbon Sequestration**\n   • Removes ~120 gigatons CO₂ annually\n   • Critical for climate regulation\n   • Forests as carbon sinks\n\n3. **Food Chain Foundation**\n   • Primary producers supporting all life\n   • Energy conversion: solar → chemical\n\n4. **Climate Regulation**\n   • Moderates global temperatures\n   • Influences water cycles\n\n**Modern Research:**\n• Artificial photosynthesis development\n• C4 and CAM pathway efficiency studies\n• Climate change impacts on photosynthetic rates\n\n**Conclusion:**\nPhotosynthesis is fundamental to life on Earth, providing oxygen, sequestering carbon, and forming the base of food webs. Understanding and protecting photosynthetic organisms is crucial for environmental sustainability."
+        }
+    ],
+    "guidelines": {
+        "depth": "Provide comprehensive analysis with multiple layers of information",
+        "structure": "Use clear sections with hierarchical organization",
+        "citations": "Reference specific data points and sources when available",
+        "context": "Explain technical terms and provide background",
+        "length": "Typically 300-600 words for thorough coverage",
+        "formatting": "Use emojis, bullets, and bold headings for readability"
+    }
+}

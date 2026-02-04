@@ -1,0 +1,38 @@
+# Core Web Framework
+Flask==3.0.0
+flask-cors==4.0.0
+python-dotenv==1.0.0
+
+# AI/ML - PyTorch with CUDA support
+# Install PyTorch separately with: pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+# Or for CPU only: pip install torch torchvision torchaudio
+
+# Transformers and Model Loading
+transformers==4.36.0
+accelerate==0.25.0
+bitsandbytes==0.41.3
+sentencepiece==0.1.99
+protobuf==4.25.1
+
+# HuggingFace Hub
+huggingface-hub==0.20.0
+
+# Vector Database and Embeddings
+chromadb==0.4.22
+sentence-transformers==2.2.2
+
+# Document Processing
+PyMuPDF==1.23.8  # PDF processing (fitz)
+python-docx==1.1.0  # Word documents
+pytesseract==0.3.10  # OCR for images
+Pillow==10.1.0  # Image processing
+markdown==3.5.1  # Markdown files
+chardet==5.2.0  # Character encoding detection
+
+# Utilities
+numpy==1.26.4
+requests==2.31.0
+tqdm==4.66.1
+
+# Optional but recommended
+psutil==5.9.6  # System monitoring

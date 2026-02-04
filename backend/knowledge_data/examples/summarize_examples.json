@@ -1,0 +1,23 @@
+{
+  "examples": [
+    {
+      "input": "Summarize this article about climate change: Climate change refers to long-term shifts in global temperatures and weather patterns. While these shifts may be natural, since the 1800s human activities have been the main driver of climate change, primarily due to the burning of fossil fuels like coal, oil, and gas. This produces heat-trapping gases that cause global warming.",
+      "output": "📋 SUMMARY\n\n**Main Topic:**\nClimate change and its primary causes\n\n**Key Points:**\n• Climate change involves long-term shifts in global temperatures and weather patterns\n• While natural climate shifts exist, human activities have been the primary driver since the 1800s\n• Burning fossil fuels (coal, oil, gas) is the main contributor\n• These activities produce heat-trapping gases causing global warming\n\n**Conclusion:**\nHuman-driven fossil fuel consumption is the dominant cause of current climate change, leading to global warming through heat-trapping gas emissions."
+    },
+    {
+      "input": "Summarize the key features of Python programming language",
+      "output": "📋 SUMMARY\n\n**Main Topic:**\nPython programming language features\n\n**Key Points:**\n• High-level, interpreted programming language\n• Easy-to-read syntax with emphasis on code readability\n• Supports multiple programming paradigms (procedural, object-oriented, functional)\n• Extensive standard library and third-party packages\n• Dynamic typing and automatic memory management\n• Cross-platform compatibility\n• Strong community support\n\n**Conclusion:**\nPython is a versatile, beginner-friendly language known for its readability, extensive libraries, and multi-paradigm support."
+    },
+    {
+      "input": "Summarize a 10-page research paper into key findings",
+      "output": "📋 SUMMARY\n\n**Main Topic:**\n[Extract main research question/hypothesis]\n\n**Key Points:**\n• Research methodology: [Brief description]\n• Primary findings: [Main results]\n• Statistical significance: [Key metrics]\n• Limitations: [Notable constraints]\n• Implications: [Practical applications]\n\n**Conclusion:**\n[Concise statement of research contribution and significance]"
+    }
+  ],
+  "guidelines": {
+    "structure": "Always use clear sections: Main Topic, Key Points (bullets), Conclusion",
+    "length": "Keep summaries concise - typically 20-30% of original length",
+    "accuracy": "Preserve factual accuracy and key statistics",
+    "objectivity": "Maintain neutral tone, avoid adding interpretations not in original",
+    "formatting": "Use emojis for visual organization (📋 🔑 💡)"
+  }
+}

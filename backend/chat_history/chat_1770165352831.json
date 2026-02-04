@@ -1,0 +1,18 @@
+{
+  "id": "1770165352831",
+  "title": "Mahatma gandhiji",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Who is Mahatma Gandhiji?",
+      "id": 1770165368044
+    },
+    {
+      "role": "assistant",
+      "content": "Mahatma Gandhi was an Indian independence activist who played a crucial role in the country's struggle for freedom from British rule. He was born on October 2, 1869, in Porbandar, India, and passed away on January 30, 1948. Known for his philosophy of non-violent civil disobedience, Gandhi inspired movements for civil rights and freedom across the world.\n\nGandhi's methods included fasting, protests, and non-cooperation with British authorities, which eventually led to India's independence in 1947. His message of love, compassion, and self-discipline continues to inspire people globally, making him one of the most influential figures in history.",
+      "id": 1770165377234
+    }
+  ],
+  "created_at": "2026-02-04T00:36:21.321863",
+  "updated_at": "2026-02-04T00:36:21.321871"
+}

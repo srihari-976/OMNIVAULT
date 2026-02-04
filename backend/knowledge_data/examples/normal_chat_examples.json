@@ -1,0 +1,28 @@
+{
+    "examples": [
+        {
+            "input": "Hello, how are you?",
+            "output": "Hello! I'm doing well, thank you for asking. I'm here to help you with whatever you need. How can I assist you today?"
+        },
+        {
+            "input": "What's the weather like?",
+            "output": "I don't have access to real-time weather data, but I'd be happy to help you in other ways! You can check weather through:\n• Weather.com or weather apps on your phone\n• Asking your voice assistant\n• Looking outside your window 😊\n\nIs there anything else I can help you with?"
+        },
+        {
+            "input": "Explain machine learning in simple terms",
+            "output": "Sure! Machine learning is like teaching a computer to learn from examples, similar to how you learned as a child.\n\n**Simple Analogy:**\nImagine teaching a child what a cat is:\n• You show them many pictures of cats\n• They notice patterns: pointed ears, whiskers, four legs\n• Eventually, they can identify a cat they've never seen before\n\n**Machine Learning Works Similarly:**\n1. **Training:** Feed the computer lots of examples (data)\n2. **Learning:** It finds patterns in that data\n3. **Prediction:** It uses those patterns to make decisions about new data\n\n**Real Examples:**\n• Email spam filters learn what spam looks like\n• Netflix recommendations learn what you enjoy\n• Voice assistants learn to understand speech\n\nThe key difference from traditional programming: instead of giving explicit instructions, you let the system figure out the patterns itself!"
+        },
+        {
+            "input": "What are the benefits of exercise?",
+            "output": "Exercise offers numerous benefits for both physical and mental health:\n\n**Physical Benefits:**\n• Strengthens heart and cardiovascular system\n• Builds and maintains muscle mass\n• Improves bone density\n• Boosts immune system\n• Aids in weight management\n• Enhances flexibility and balance\n\n**Mental Benefits:**\n• Reduces stress and anxiety\n• Improves mood through endorphin release\n• Enhances cognitive function and memory\n• Better sleep quality\n• Increases energy levels\n\n**Long-term Effects:**\n• Reduces risk of chronic diseases (diabetes, heart disease)\n• Increases longevity\n• Maintains independence in older age\n\n**Recommendations:**\nAim for at least 150 minutes of moderate activity or 75 minutes of vigorous activity per week, plus strength training twice weekly.\n\nRemember: Any movement is better than none! Start small and build up gradually."
+        }
+    ],
+    "guidelines": {
+        "tone": "Friendly, helpful, and conversational",
+        "length": "Vary based on complexity - concise for simple queries, detailed for complex ones",
+        "formatting": "Use bullets, emojis, and sections for readability",
+        "accuracy": "Provide factual, reliable information",
+        "engagement": "Ask follow-up questions when appropriate",
+        "limitations": "Acknowledge when you don't have information"
+    }
+}

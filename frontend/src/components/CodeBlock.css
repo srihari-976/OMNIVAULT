@@ -1,0 +1,127 @@
+.code-block-wrapper {
+  margin: 16px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid;
+  transition: border-color 0.3s;
+}
+
+.theme-dark .code-block-wrapper {
+  background-color: #1e1e1e;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.theme-light .code-block-wrapper {
+  background-color: #2d2d2d;
+  border-color: rgba(0, 0, 0, 0.2);
+}
+
+.code-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid;
+  transition: border-color 0.3s, background-color 0.3s;
+}
+
+.theme-dark .code-block-header {
+  background-color: #252526;
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+.theme-light .code-block-header {
+  background-color: #3e3e3e;
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+.code-language {
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: color 0.3s;
+}
+
+.theme-dark .code-language {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.theme-light .code-language {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.code-copy-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  transition: background-color 0.2s, color 0.3s;
+}
+
+.theme-dark .code-copy-btn {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.theme-light .code-copy-btn {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.theme-dark .code-copy-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.theme-light .code-copy-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 1);
+}
+
+.code-copy-text {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.code-block {
+  margin: 0;
+  padding: 16px;
+  overflow-x: auto;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  background-color: #1e1e1e;
+  color: #d4d4d4;
+}
+
+.code-block code {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  background: transparent;
+  padding: 0;
+  border: none;
+  white-space: pre;
+  word-wrap: normal;
+}
+
+.code-block::-webkit-scrollbar {
+  height: 8px;
+}
+
+.code-block::-webkit-scrollbar-track {
+  background: #1e1e1e;
+}
+
+.code-block::-webkit-scrollbar-thumb {
+  background: #424242;
+  border-radius: 4px;
+}
+
+.code-block::-webkit-scrollbar-thumb:hover {
+  background: #4e4e4e;
+}

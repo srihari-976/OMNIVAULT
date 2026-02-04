@@ -1,0 +1,18 @@
+{
+  "id": "1770165384222",
+  "title": "Write python code checking wheather",
+  "messages": [
+    {
+      "role": "user",
+      "content": "write a python code for checking wheather a number is armstrong number or not",
+      "id": 1770165435100
+    },
+    {
+      "role": "assistant",
+      "content": "An Armstrong number is a number that is equal to the sum of cubes of its digits. For example, 371 is an Armstrong number since 3*3*3 + 7*7*7 + 1*1*1 = 371. Here's a Python function that checks whether a given number is an Armstrong number or not:\n\n```\ndef is_armstrong(n):\n\n# Convert the number into a string to easily access individual digits\nstr_n = str(n)\n\n# Calculate the sum of cubes of its digits\nsum_of_cubes = sum([int(digit)**len(str_n) for digit in str_n])\n\n# Check if the sum of cubes equals the original number\nreturn n == sum_of_cubes\n```\n\nExample usage:\n\n```\nprint(is_armstrong(371))  # Output: True\nprint(is_armstrong(123))  # Output: False\n```\n\nDo you want me to explain any part of this code?",
+      "id": 1770165446503
+    }
+  ],
+  "created_at": "2026-02-04T00:37:31.048917",
+  "updated_at": "2026-02-04T00:37:31.048926"
+}
