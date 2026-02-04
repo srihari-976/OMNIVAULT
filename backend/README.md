@@ -45,12 +45,8 @@ sudo apt-get install tesseract-ocr
 ```bash
 # Copy environment template
 cp .env.example .env
-
-# Edit .env and add your HuggingFace token
-# HUGGINGFACE_TOKEN=your_token_here
 ```
 
-Your HuggingFace token is already configured: `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`
 
 ### 3. Setup GPU (WSL)
 
