@@ -208,7 +208,8 @@ function App() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            query: userMessage
+            query: userMessage,
+            session_id: currentChatId ? String(currentChatId) : undefined
           }),
         });
       } else {
@@ -221,7 +222,9 @@ function App() {
             message: userMessage,
             mode: backendMode,
             use_rag: useRag,
-            conversation_history: conversationHistory
+            session_id: currentChatId ? String(currentChatId) : undefined,
+            conversation_history: conversationHistory,
+            attached_files: attachedFiles.length > 0 ? attachedFiles : undefined
           }),
         });
       }
@@ -363,6 +366,7 @@ function App() {
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         isThinking={isThinking}
         onNewChat={createNewChat}
+        currentChatId={currentChatId}
       />
       {settingsOpen && (
         <Settings onClose={() => setSettingsOpen(false)} />

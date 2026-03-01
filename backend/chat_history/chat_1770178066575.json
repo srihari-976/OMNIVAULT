@@ -1,0 +1,18 @@
+{
+  "id": "1770178066575",
+  "title": "Write code checking wheather number",
+  "messages": [
+    {
+      "role": "user",
+      "content": "write a code for checking wheather a number is prime or not",
+      "id": 1770179611409
+    },
+    {
+      "role": "assistant",
+      "content": "A simple function to check if a number is prime can be written as follows:\n\n```python\ndef is_prime(n):\n\"\"\"Check if a number is prime.\"\"\"\nif n <= 1:\nreturn False\nif n == 2:\nreturn True\nif n % 2 == 0:\nreturn False\nmax_divisor = int(n**0.5)\nfor i in range(3, max_divisor + 1, 2):\nif n % i == 0:\nreturn False\nreturn True\n```\n\nHere's an explanation of how the code works:\n\n- We first handle the edge cases where `n` is less than or equal to 1 (`n <= 1`) or equals 2 (`n == 2`). For these values, we immediately return `False`.\n- If `n` is even but not 2, we know that it's not a prime number (`n % 2 == 0`). This optimization allows us to skip half of the possible divisors.\n- Next, we calculate the maximum divisor for `n`. Since any factor larger than this would have a corresponding factor smaller than the square root of `n`, we only need to check up to the square root.\n- Finally, we iterate over odd numbers from 3 to the calculated maximum divisor, checking if `n` has any divisors by performing the modulo operation (`n % i == 0`). As soon as we find a divisor, we return `False`.\n\nYou can test this function with different inputs to see if it accurately identifies whether a number is prime or not.",
+      "id": 1770179632673
+    }
+  ],
+  "created_at": "2026-02-04T04:34:13.337501",
+  "updated_at": "2026-02-04T04:34:13.337509"
+}

@@ -90,10 +90,25 @@ Support multiple programming languages and frameworks."""
         # System prompt
         prompt_parts.append(f"System: {PromptBuilder.SYSTEM_PROMPTS['chat']}\n")
         
-        # Add context if available
+        # Add context if available — use grounded RAG instructions
         if context_docs and len(context_docs) > 0:
-            context_text = "\n\n".join([doc['document'] for doc in context_docs[:3]])
-            prompt_parts.append(f"\nRelevant Context:\n{context_text}\n")
+            # Build context with source info
+            context_parts = []
+            for i, doc in enumerate(context_docs[:5], 1):
+                source = doc.get('metadata', {}).get('filename', 'Uploaded Document')
+                context_parts.append(f"[Document: {source}]\n{doc['document']}")
+            context_text = "\n\n".join(context_parts)
+            
+            prompt_parts.append(
+                "\n\nIMPORTANT: The user has uploaded document(s). The text below is extracted via OCR or PDF parsing, "
+                "so it may contain formatting artifacts, weird symbols, or jumbled layouts. "
+                "DO NOT dismiss the document as a 'sample', 'template', or 'example' just because the text looks messy. "
+                "Treat it as a REAL document. You MUST read this content carefully and extract the ACTUAL details "
+                "visible in the text (such as specific names, ID numbers, addresses, DOBs, marks, or organizations) exactly as they appear. "
+                "Answer the user's question based ONLY on what is in the document(s). "
+                "If the information requested is not found, say so explicitly.\n"
+            )
+            prompt_parts.append(f"\n--- UPLOADED DOCUMENT CONTENT ---\n{context_text}\n--- END OF DOCUMENT CONTENT ---\n")
         
         # Add conversation history if available
         if conversation_history:

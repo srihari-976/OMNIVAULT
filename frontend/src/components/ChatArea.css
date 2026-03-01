@@ -808,6 +808,68 @@
   background-color: rgba(171, 104, 255, 0.2);
 }
 
+/* Upload progress ring */
+.upload-progress-ring-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+}
+
+.upload-progress-ring {
+  transform: rotate(-90deg);
+}
+
+.theme-dark .upload-progress-ring-bg {
+  stroke: rgba(255, 255, 255, 0.12);
+}
+
+.theme-light .upload-progress-ring-bg {
+  stroke: rgba(0, 0, 0, 0.1);
+}
+
+.upload-progress-ring-fill {
+  transition: stroke-dashoffset 0.4s ease;
+}
+
+.theme-dark .upload-progress-ring-fill {
+  stroke: #ab68ff;
+}
+
+.theme-light .upload-progress-ring-fill {
+  stroke: #8b44d6;
+}
+
+.file-chip.processing .upload-progress-ring-fill,
+.file-chip.indexing .upload-progress-ring-fill {
+  stroke: #ffc107;
+}
+
+.theme-light .file-chip.processing .upload-progress-ring-fill,
+.theme-light .file-chip.indexing .upload-progress-ring-fill {
+  stroke: #f57c00;
+}
+
+.upload-progress-ring-text {
+  position: absolute;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  user-select: none;
+}
+
+.theme-dark .upload-progress-ring-text {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.theme-light .upload-progress-ring-text {
+  color: rgba(0, 0, 0, 0.7);
+}
+
+/* Upload status bar */
 .upload-status {
   max-width: 768px;
   margin: 0 auto 8px auto;
@@ -815,7 +877,10 @@
   border-radius: 8px;
   font-size: 13px;
   text-align: center;
-  animation: pulse 1.5s ease-in-out infinite;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
 .theme-dark .upload-status {
@@ -826,6 +891,73 @@
 .theme-light .upload-status {
   background-color: rgba(25, 195, 125, 0.12);
   color: #158a5f;
+}
+
+.upload-status-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.theme-dark .upload-status-spinner {
+  border-top-color: #19c37d;
+  border-right-color: #19c37d;
+}
+
+.theme-light .upload-status-spinner {
+  border-top-color: #158a5f;
+  border-right-color: #158a5f;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Message file chips (read-only badges in chat) */
+.message-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.message-file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid;
+  max-width: 250px;
+  user-select: none;
+}
+
+.message-file-chip svg {
+  flex-shrink: 0;
+}
+
+.message-file-chip span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.theme-dark .message-file-chip {
+  background-color: rgba(171, 104, 255, 0.12);
+  color: #c9a3ff;
+  border-color: rgba(171, 104, 255, 0.25);
+}
+
+.theme-light .message-file-chip {
+  background-color: rgba(171, 104, 255, 0.1);
+  color: #7b3fbf;
+  border-color: rgba(171, 104, 255, 0.2);
 }
 
 @keyframes pulse {
@@ -866,12 +998,18 @@
   font-size: 16px;
   resize: none;
   max-height: 200px;
-  overflow-y: auto;
+  overflow-y: hidden;  /* auto-resize via JS — no scrollbar needed */
   font-family: inherit;
   line-height: 1.5;
   padding: 4px 0;
   transition: color 0.3s;
   align-self: center;
+  scrollbar-width: none;       /* Firefox */
+  -ms-overflow-style: none;    /* IE/Edge */
+}
+
+.chat-input::-webkit-scrollbar {
+  display: none;               /* Chrome/Safari — belt-and-suspenders */
 }
 
 .theme-dark .chat-input {

@@ -26,6 +26,9 @@ app = Flask(__name__,
             static_url_path='')
 CORS(app)
 
+# Allow up to 50 MB uploads (Flask default is ~16 MB — would reject large files silently)
+app.config['MAX_CONTENT_LENGTH'] = Config.MAX_FILE_SIZE  # 50 * 1024 * 1024
+
 # Create necessary directories
 Config.create_directories()
 
@@ -92,6 +95,7 @@ def process_documents_worker():
             file_id = task['file_id']
             filepath = task['filepath']
             filename = task['filename']
+            session_id = task.get('session_id')
             
             print(f"\n📄 Processing queued file: {filename} (ID: {file_id})")
             
@@ -119,7 +123,7 @@ def process_documents_worker():
                     processing_status[file_id]['progress'] = 70
                     processing_status[file_id]['updated_at'] = datetime.now().isoformat()
                 
-                # Add to RAG engine
+                # Add to RAG engine with session_id
                 chunks_added = rag_engine.add_document(
                     filename=filename,
                     text=processed['text'],
@@ -128,7 +132,8 @@ def process_documents_worker():
                         'extension': processed['extension'],
                         'word_count': processed['word_count'],
                         'file_id': file_id
-                    }
+                    },
+                    session_id=session_id
                 )
                 
                 # Update status: completed
@@ -226,7 +231,9 @@ def chat():
         message = data.get('message', '')
         mode = data.get('mode', 'chat')
         use_rag = data.get('use_rag', True)
+        session_id = data.get('session_id', None)
         conversation_history = data.get('conversation_history', [])
+        attached_files = data.get('attached_files', [])  # Files attached to this query
         
         if not message:
             return jsonify({'error': 'Message is required'}), 400
@@ -234,18 +241,74 @@ def chat():
         # Get mode settings
         mode_settings = Config.MODES.get(mode, Config.MODES['chat'])
         
-        # Retrieve relevant context if RAG is enabled
+        # ======================================================================
+        # RAG RETRIEVAL — 3-tier strategy
+        # ======================================================================
         context_docs = []
-        if use_rag and mode_settings.get('use_rag', False):
+        session_doc_names = []
+        
+        # TIER 1: Attached files → directly retrieve chunks by filename (no similarity threshold)
+        if attached_files and len(attached_files) > 0:
+            for af in attached_files:
+                fname = af.get('name', '')
+                if fname:
+                    file_chunks = rag_engine.get_chunks_by_filename(fname, session_id=session_id)
+                    if not file_chunks:
+                        file_chunks = rag_engine.get_chunks_by_filename(fname)  # global fallback
+                    context_docs.extend(file_chunks)
+                    if file_chunks:
+                        session_doc_names.append(fname)
+            print(f"📎 TIER1: Retrieved {len(context_docs)} chunks from {len(attached_files)} attached file(s)")
+        
+        # TIER 2: No attached files → check if session has ANY uploaded documents
+        # Fetch all session docs directly (catches generic queries like 'what is in the file')
+        if not context_docs and session_id:
+            session_docs_meta = rag_engine.get_all_documents(session_id=session_id)
+            if session_docs_meta:
+                for doc_meta in session_docs_meta:
+                    fname = doc_meta.get('filename', '')
+                    if fname:
+                        file_chunks = rag_engine.get_chunks_by_filename(fname, session_id=session_id)
+                        context_docs.extend(file_chunks)
+                        session_doc_names.append(fname)
+                print(f"📎 TIER2: Retrieved {len(context_docs)} chunks from {len(session_docs_meta)} session document(s)")
+        
+        # TIER 2b: No session_id or no session docs → try global session docs
+        if not context_docs:
+            all_docs_meta = rag_engine.get_all_documents()
+            if all_docs_meta:
+                for doc_meta in all_docs_meta[:3]:  # limit to 3 most recent docs
+                    fname = doc_meta.get('filename', '')
+                    if fname:
+                        file_chunks = rag_engine.get_chunks_by_filename(fname)
+                        context_docs.extend(file_chunks)
+                        session_doc_names.append(fname)
+                if context_docs:
+                    print(f"📎 TIER2b: Retrieved {len(context_docs)} chunks from global documents")
+        
+        # TIER 3: Pure semantic search (when no docs exist at all)
+        if not context_docs and use_rag and mode_settings.get('use_rag', False):
             top_k = mode_settings.get('top_k', 3)
             if top_k > 0:
-                context_docs = rag_engine.semantic_search(message, top_k=top_k)
-                print(f"📚 Retrieved {len(context_docs)} relevant documents")
+                context_docs = rag_engine.semantic_search(message, top_k=top_k, session_id=session_id)
+                if not context_docs:
+                    context_docs = rag_engine.semantic_search(message, top_k=top_k)
+                print(f"📚 TIER3: Semantic search retrieved {len(context_docs)} documents")
+        
+        # Build enhanced message that tells the model about the uploaded files
+        enhanced_message = message
+        if context_docs:
+            file_names_str = ', '.join(session_doc_names) if session_doc_names else 'uploaded document(s)'
+            enhanced_message = (
+                f"The user has uploaded the following file(s): {file_names_str}. "
+                f"Read the document content carefully and answer the user's question based on the actual content.\n\n"
+                f"User's question: {message}"
+            )
         
         # Build prompt
         prompt = PromptBuilder.build_prompt(
             mode=mode,
-            user_message=message,
+            user_message=enhanced_message,
             context_docs=context_docs,
             conversation_history=conversation_history
         )
@@ -337,6 +400,7 @@ def deep_research():
         
         data = request.get_json()
         query = data.get('query', '')
+        session_id = data.get('session_id', None)
         
         if not query:
             return jsonify({'error': 'Query is required'}), 400
@@ -352,8 +416,8 @@ def deep_research():
         # Phase 2: RAG Retrieval
         rag_docs = []
         if rag_engine.collection.count() > 0:
-            rag_docs = rag_engine.semantic_search(query, top_k=10)
-            print(f"📚 Retrieved {len(rag_docs)} documents from knowledge base")
+            rag_docs = rag_engine.semantic_search(query, top_k=10, session_id=session_id)
+            print(f"📚 Retrieved {len(rag_docs)} documents from knowledge base (session: {session_id or 'global'})")
         
         # Phase 3: Synthesize answer
         if web_results or rag_docs:
@@ -426,7 +490,7 @@ def code_assist():
             return jsonify({'error': 'Message is required'}), 400
         
         # Search for relevant code context
-        context_docs = rag_engine.semantic_search(message, top_k=3)
+        context_docs = rag_engine.semantic_search(message, top_k=3, session_id=data.get('session_id'))
         
         prompt = PromptBuilder.build_coding_prompt(message, context_docs)
         
@@ -458,6 +522,8 @@ def upload_file():
             return jsonify({'error': 'No file provided'}), 400
         
         file = request.files['file']
+        session_id = request.form.get('session_id', None)
+        
         if file.filename == '':
             return jsonify({'error': 'No file selected'}), 400
         
@@ -471,15 +537,31 @@ def upload_file():
         # Generate unique file ID
         file_id = str(uuid.uuid4())
         
-        # Save file immediately
+        # Save file immediately — into session subdirectory if session_id provided
         filename = file.filename
         # Add timestamp to filename to avoid collisions
         base_name, ext = os.path.splitext(filename)
         safe_filename = f"{base_name}_{int(time.time())}{ext}"
-        filepath = os.path.join(Config.UPLOAD_DIR, safe_filename)
+        
+        if session_id:
+            session_upload_dir = os.path.join(Config.UPLOAD_DIR, str(session_id))
+            os.makedirs(session_upload_dir, exist_ok=True)
+            filepath = os.path.join(session_upload_dir, safe_filename)
+        else:
+            filepath = os.path.join(Config.UPLOAD_DIR, safe_filename)
         
         file.save(filepath)
-        print(f"✓ File saved: {safe_filename}")
+        print(f"✓ File saved: {safe_filename} (session: {session_id or 'global'})")
+        
+        # Enforce soft upload size limit to prevent hanging WSL/CPU during embedding
+        file_size_mb = os.path.getsize(filepath) / (1024 * 1024)
+        max_mb = getattr(Config, 'MAX_UPLOAD_SIZE_MB', 10)
+        if file_size_mb > max_mb:
+            os.remove(filepath)
+            return jsonify({
+                'error': f'File too large ({file_size_mb:.1f} MB). Maximum allowed size is {max_mb} MB. '
+                         f'Please split the document into smaller parts.'
+            }), 400
         
         # Set initial status
         with processing_lock:
@@ -489,24 +571,27 @@ def upload_file():
                 'progress': 10,
                 'filename': filename,
                 'safe_filename': safe_filename,
+                'session_id': session_id,
                 'uploaded_at': datetime.now().isoformat(),
                 'updated_at': datetime.now().isoformat()
             }
         
-        # Queue for processing
+        # Queue for processing — include session_id
         processing_queue.put({
             'file_id': file_id,
             'filepath': filepath,
-            'filename': filename
+            'filename': filename,
+            'session_id': session_id
         })
         
-        print(f"📋 File queued for processing: {filename} (ID: {file_id})")
+        print(f"📋 File queued for processing: {filename} (ID: {file_id}, session: {session_id or 'global'})")
         
         # Return immediately with file ID
         return jsonify({
             'message': 'File uploaded successfully and queued for processing',
             'file_id': file_id,
             'filename': filename,
+            'session_id': session_id,
             'status': 'queued',
             'timestamp': datetime.now().isoformat()
         }), 200
@@ -558,9 +643,10 @@ def get_all_upload_status():
 
 @app.route('/api/documents', methods=['GET'])
 def get_documents():
-    """Get all indexed documents"""
+    """Get all indexed documents, optionally filtered by session_id"""
     try:
-        documents = rag_engine.get_all_documents()
+        session_id = request.args.get('session_id', None)
+        documents = rag_engine.get_all_documents(session_id=session_id)
         stats = rag_engine.get_stats()
         
         return jsonify({
@@ -600,11 +686,12 @@ def search_documents():
         data = request.get_json()
         query = data.get('query', '')
         top_k = data.get('top_k', 5)
+        session_id = data.get('session_id', None)
         
         if not query:
             return jsonify({'error': 'Query is required'}), 400
         
-        results = rag_engine.semantic_search(query, top_k=top_k)
+        results = rag_engine.semantic_search(query, top_k=top_k, session_id=session_id)
         
         return jsonify({
             'query': query,

@@ -4,7 +4,7 @@ import { useTheme } from '../context/ThemeContext';
 import ThinkingIndicator from './ThinkingIndicator';
 import CodeBlock from './CodeBlock';
 
-const ChatArea = ({ messages, onSendMessage, sidebarOpen, onToggleSidebar, isThinking, onNewChat }) => {
+const ChatArea = ({ messages, onSendMessage, sidebarOpen, onToggleSidebar, isThinking, onNewChat, currentChatId }) => {
   const { theme, toggleTheme } = useTheme();
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -12,9 +12,15 @@ const ChatArea = ({ messages, onSendMessage, sidebarOpen, onToggleSidebar, isThi
   const [activeMode, setActiveMode] = useState(null); // 'summarize', 'deep-research', or null
   const [uploadedFiles, setUploadedFiles] = useState([]); // Track uploaded files
   const [isUploading, setIsUploading] = useState(false);
+  const uploadedFilesRef = useRef([]); // Ref to always have latest files in handlers
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
   const plusMenuRef = useRef(null);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    uploadedFilesRef.current = uploadedFiles;
+  }, [uploadedFiles]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -60,7 +66,7 @@ const ChatArea = ({ messages, onSendMessage, sidebarOpen, onToggleSidebar, isThi
         const fileInput = document.createElement('input');
         fileInput.type = 'file';
         fileInput.multiple = true;
-        fileInput.accept = '.pdf,.doc,.docx,.txt,.md,.py,.js,.java,.cpp,.c,.html,.css,.json,.xml';
+        fileInput.accept = '.pdf,.doc,.docx,.txt,.md,.py,.js,.java,.cpp,.c,.html,.css,.json,.xml,.png,.jpg,.jpeg,.gif,.bmp';
         fileInput.onchange = async (e) => {
           const files = Array.from(e.target.files);
           if (files.length > 0) {
@@ -71,6 +77,9 @@ const ChatArea = ({ messages, onSendMessage, sidebarOpen, onToggleSidebar, isThi
               try {
                 const formData = new FormData();
                 formData.append('file', file);
+                if (currentChatId) {
+                  formData.append('session_id', String(currentChatId));
+                }
 
                 const uploadResponse = await fetch('/api/upload', {
                   method: 'POST',
@@ -126,7 +135,7 @@ const ChatArea = ({ messages, onSendMessage, sidebarOpen, onToggleSidebar, isThi
   };
 
   const pollFileStatus = async (fileId) => {
-    const maxAttempts = 60; // Poll for up to 1 minute
+    const maxAttempts = 180; // Poll for up to 3 minutes (CPU embedding can be slow)
     let attempts = 0;
 
     const poll = async () => {
@@ -155,9 +164,18 @@ const ChatArea = ({ messages, onSendMessage, sidebarOpen, onToggleSidebar, isThi
         }));
 
         // Continue polling if not completed or failed
-        if (status.status !== 'completed' && status.status !== 'failed' && attempts < maxAttempts) {
-          attempts++;
-          setTimeout(poll, 1000); // Poll every second
+        if (status.status !== 'completed' && status.status !== 'failed') {
+          if (attempts < maxAttempts) {
+            attempts++;
+            setTimeout(poll, 1000); // Poll every second
+          } else {
+            // Timed out — update chip to show it's still processing in background
+            setUploadedFiles(prev => prev.map(f =>
+              f.id === fileId
+                ? { ...f, status: 'processing', message: 'Still processing in background...', progress: 70 }
+                : f
+            ));
+          }
         }
       } catch (error) {
         console.error('Error polling file status:', error);
@@ -190,10 +208,18 @@ const ChatArea = ({ messages, onSendMessage, sidebarOpen, onToggleSidebar, isThi
       setActiveMode(null); // Clear mode after sending
     }
 
+    // Use ref to get latest files (avoids stale closure)
+    const currentFiles = uploadedFilesRef.current;
+    const filesToSend = currentFiles.length > 0
+      ? currentFiles.map(f => ({ id: f.id, name: f.name, status: f.status }))
+      : [];
+
     setInput('');
+    setUploadedFiles([]); // Clear files from input after sending
+    uploadedFilesRef.current = []; // Also clear ref immediately
     setIsLoading(true);
 
-    await onSendMessage(message, mode);
+    await onSendMessage(message, mode, filesToSend);
     setIsLoading(false);
   };
 
@@ -340,6 +366,20 @@ const ChatArea = ({ messages, onSendMessage, sidebarOpen, onToggleSidebar, isThi
                   )}
                 </div>
                 <div className="message-content">
+                  {/* Show attached files in user messages */}
+                  {message.role === 'user' && message.files && message.files.length > 0 && (
+                    <div className="message-files">
+                      {message.files.map((file, idx) => (
+                        <div key={file.id || idx} className="message-file-chip">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M13 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V9L13 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            <path d="M13 2V9H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                          <span>{file.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   {parseMessage(message.content).map((part, index) => {
                     if (part.type === 'code') {
                       return <CodeBlock key={index} code={part.code} language={part.language} />;
@@ -400,42 +440,84 @@ const ChatArea = ({ messages, onSendMessage, sidebarOpen, onToggleSidebar, isThi
           )}
           {uploadedFiles.length > 0 && (
             <div className="file-chips-container">
-              {uploadedFiles.map(file => (
-                <div key={file.id} className={`file-chip ${file.status || ''}`}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M13 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V9L13 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M13 2V9H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  <span className="file-chip-name">
-                    {file.name}
-                    {file.status && file.status !== 'completed' && (
-                      <span className="file-chip-status">
-                        {file.status === 'queued' && ' (Queued)'}
-                        {file.status === 'processing' && ' (Processing...)'}
-                        {file.status === 'indexing' && ' (Indexing...)'}
-                        {file.status === 'failed' && ' (Failed)'}
-                      </span>
+              {uploadedFiles.map(file => {
+                const progress = file.progress || 0;
+                const radius = 10;
+                const circumference = 2 * Math.PI * radius;
+                const strokeDashoffset = circumference - (progress / 100) * circumference;
+                const isComplete = file.status === 'completed';
+                const isFailed = file.status === 'failed';
+
+                return (
+                  <div key={file.id} className={`file-chip ${file.status || ''}`}>
+                    {/* Circular progress ring */}
+                    {!isComplete && !isFailed && (
+                      <div className="upload-progress-ring-wrapper">
+                        <svg className="upload-progress-ring" width="48" height="48" viewBox="0 0 48 48">
+                          <circle
+                            className="upload-progress-ring-bg"
+                            cx="24" cy="24" r={18}
+                            fill="none"
+                            strokeWidth="3"
+                          />
+                          <circle
+                            className="upload-progress-ring-fill"
+                            cx="24" cy="24" r={18}
+                            fill="none"
+                            strokeWidth="3"
+                            strokeLinecap="round"
+                            strokeDasharray={2 * Math.PI * 18}
+                            strokeDashoffset={2 * Math.PI * 18 - (progress / 100) * 2 * Math.PI * 18}
+                          />
+                        </svg>
+                        <span className="upload-progress-ring-text">{progress}%</span>
+                      </div>
                     )}
-                    {file.status === 'completed' && file.chunks && (
-                      <span className="file-chip-status"> ({file.chunks} chunks)</span>
+                    {isComplete && (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
                     )}
-                  </span>
-                  <button
-                    type="button"
-                    className="file-chip-close"
-                    onClick={() => removeFile(file.id)}
-                    title="Remove file"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                    </svg>
-                  </button>
-                </div>
-              ))}
+                    {isFailed && (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+                        <path d="M15 9L9 15M9 9L15 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                      </svg>
+                    )}
+                    <span className="file-chip-name">
+                      {file.name}
+                      {file.status && file.status !== 'completed' && !isFailed && (
+                        <span className="file-chip-status">
+                          {file.status === 'queued' && ' (Queued)'}
+                          {file.status === 'processing' && ' (Processing...)'}
+                          {file.status === 'indexing' && ' (Indexing...)'}
+                        </span>
+                      )}
+                      {isFailed && (
+                        <span className="file-chip-status"> (Failed)</span>
+                      )}
+                      {isComplete && file.chunks && (
+                        <span className="file-chip-status"> Ready ✓</span>
+                      )}
+                    </span>
+                    <button
+                      type="button"
+                      className="file-chip-close"
+                      onClick={() => removeFile(file.id)}
+                      title="Remove file"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                      </svg>
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           )}
           {isUploading && (
             <div className="upload-status">
+              <div className="upload-status-spinner"></div>
               <span>Uploading files...</span>
             </div>
           )}

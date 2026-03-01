@@ -28,10 +28,20 @@ class RAGEngine:
             print(f"✓ RAG Engine initialized with {self.collection.count()} documents")
     
     def _load_embedding_model(self):
-        """Load sentence transformer model for embeddings"""
-        print(f"Loading embedding model: {Config.EMBEDDING_MODEL}")
-        model = SentenceTransformer(Config.EMBEDDING_MODEL)
-        print("✓ Embedding model loaded")
+        """Load sentence transformer model for embeddings — GPU preferred"""
+        import torch
+        device_pref = getattr(Config, 'EMBEDDING_DEVICE', 'cuda')
+        if device_pref == 'cuda' and not torch.cuda.is_available():
+            print("⚠️  CUDA not available — falling back to CPU for embeddings")
+            device_pref = 'cpu'
+        else:
+            if device_pref == 'cuda':
+                gpu_name = torch.cuda.get_device_name(0)
+                print(f"🚀 GPU detected for embeddings: {gpu_name}")
+        print(f"Loading embedding model: {Config.EMBEDDING_MODEL} on [{device_pref}]")
+        model = SentenceTransformer(Config.EMBEDDING_MODEL, device=device_pref)
+        print(f"✓ Embedding model loaded on [{device_pref}]")
+        self._embedding_device = device_pref
         return model
     
     def _init_chromadb(self):
@@ -100,15 +110,31 @@ class RAGEngine:
         
         return chunks
     
-    def generate_embeddings(self, texts):
-        """Generate embeddings for a list of texts"""
+    def generate_embeddings(self, texts, batch_size=64):
+        """Generate embeddings using GPU-accelerated batched encoding.
+        
+        batch_size=64 is optimal for GPU VRAM (all-MiniLM-L6-v2 is tiny).
+        Falls back gracefully on CPU with batch_size=16 to avoid OOM.
+        """
         if isinstance(texts, str):
             texts = [texts]
         
-        embeddings = self.embedding_model.encode(texts, show_progress_bar=False)
-        return embeddings.tolist()
+        # Reduce batch size automatically on CPU to control memory
+        device = getattr(self, '_embedding_device', 'cpu')
+        if device == 'cpu':
+            batch_size = min(batch_size, 16)
+        
+        all_embeddings = self.embedding_model.encode(
+            texts,
+            batch_size=batch_size,
+            show_progress_bar=len(texts) > 50,  # Show progress bar for large docs
+            convert_to_numpy=True,
+            normalize_embeddings=True           # L2-normalize — improves cosine sim accuracy
+        )
+        
+        return all_embeddings.tolist()
     
-    def add_document(self, filename, text, metadata=None):
+    def add_document(self, filename, text, metadata=None, session_id=None):
         """
         Add a document to the vector database
         
@@ -116,6 +142,7 @@ class RAGEngine:
             filename: Name of the source file
             text: Extracted text from document
             metadata: Additional metadata (dict)
+            session_id: Session ID for isolation (optional)
         
         Returns:
             Number of chunks added
@@ -127,9 +154,15 @@ class RAGEngine:
             print(f"No chunks generated for {filename}")
             return 0
         
+        # Apply safety cap to prevent runaway processing on huge documents
+        max_chunks = getattr(Config, 'MAX_CHUNKS_PER_DOC', None)
+        if max_chunks and len(chunks) > max_chunks:
+            print(f"⚠️  Document has {len(chunks)} chunks — capping at {max_chunks} for {filename}")
+            chunks = chunks[:max_chunks]
+        
         print(f"Generated {len(chunks)} chunks from {filename}")
         
-        # Generate embeddings
+        # Generate embeddings in small batches to avoid memory spikes
         embeddings = self.generate_embeddings(chunks)
         
         # Prepare metadata
@@ -138,6 +171,10 @@ class RAGEngine:
             "timestamp": datetime.now().isoformat(),
             "total_chunks": len(chunks)
         }
+        
+        # Add session_id to metadata for isolation
+        if session_id:
+            base_metadata["session_id"] = str(session_id)
         
         if metadata:
             base_metadata.update(metadata)
@@ -162,10 +199,10 @@ class RAGEngine:
             metadatas=metadatas
         )
         
-        print(f"✓ Added {len(chunks)} chunks to vector database")
+        print(f"✓ Added {len(chunks)} chunks to vector database (session: {session_id or 'global'})")
         return len(chunks)
     
-    def semantic_search(self, query, top_k=None, filter_metadata=None):
+    def semantic_search(self, query, top_k=None, filter_metadata=None, session_id=None):
         """
         Perform semantic search on the vector database
         
@@ -173,6 +210,7 @@ class RAGEngine:
             query: Search query
             top_k: Number of results to return
             filter_metadata: Optional metadata filter (dict)
+            session_id: Session ID for isolation (optional)
         
         Returns:
             List of results with documents, metadata, and distances
@@ -182,12 +220,22 @@ class RAGEngine:
         # Generate query embedding
         query_embedding = self.generate_embeddings(query)
         
+        # Build filter — session_id takes priority
+        where_filter = filter_metadata
+        if session_id:
+            where_filter = {"session_id": str(session_id)}
+        
         # Search
-        results = self.collection.query(
-            query_embeddings=query_embedding,
-            n_results=top_k,
-            where=filter_metadata
-        )
+        try:
+            results = self.collection.query(
+                query_embeddings=query_embedding,
+                n_results=top_k,
+                where=where_filter
+            )
+        except Exception as e:
+            # If filter yields no results ChromaDB may error; return empty
+            print(f"⚠️ Search error (possibly no docs for session): {e}")
+            return []
         
         # Format results
         formatted_results = []
@@ -207,31 +255,90 @@ class RAGEngine:
         
         return formatted_results
     
-    def delete_document(self, doc_id=None, filename=None):
-        """Delete a document by ID or filename"""
+    def get_chunks_by_filename(self, filename, session_id=None, max_chunks=500):
+        """
+        Retrieve all chunks for a specific file by its filename.
+        This bypasses semantic search — used when user explicitly attaches a file.
+        
+        Args:
+            filename: Name of the file to retrieve chunks for
+            session_id: Optional session ID for isolation
+            max_chunks: Maximum number of chunks to return
+        
+        Returns:
+            List of results with documents and metadata
+        """
+        try:
+            # Build filter
+            if session_id:
+                where_filter = {
+                    "$and": [
+                        {"filename": filename},
+                        {"session_id": str(session_id)}
+                    ]
+                }
+            else:
+                where_filter = {"filename": filename}
+            
+            results = self.collection.get(
+                where=where_filter,
+                limit=max_chunks
+            )
+            
+            if not results or not results['ids']:
+                return []
+            
+            formatted = []
+            for i in range(len(results['ids'])):
+                formatted.append({
+                    'id': results['ids'][i],
+                    'document': results['documents'][i],
+                    'metadata': results['metadatas'][i],
+                    'similarity': 1.0  # Direct match, full relevance
+                })
+            
+            # Sort by chunk_index for proper ordering
+            formatted.sort(key=lambda x: x['metadata'].get('chunk_index', 0))
+            
+            print(f"📄 Retrieved {len(formatted)} chunks for file: {filename}")
+            return formatted
+            
+        except Exception as e:
+            print(f"⚠️ Error retrieving chunks for {filename}: {e}")
+            return []
+    
+    def delete_document(self, doc_id=None, filename=None, session_id=None):
+        """Delete a document by ID, filename, or session"""
         if doc_id:
             # Delete by doc_id
-            results = self.collection.get(
-                where={"doc_id": doc_id}
-            )
+            where_filter = {"doc_id": doc_id}
+            results = self.collection.get(where=where_filter)
             if results and results['ids']:
                 self.collection.delete(ids=results['ids'])
                 return len(results['ids'])
         
         if filename:
-            # Delete by filename
-            results = self.collection.get(
-                where={"filename": filename}
-            )
+            # Delete by filename (optionally scoped to session)
+            if session_id:
+                where_filter = {"$and": [{"filename": filename}, {"session_id": str(session_id)}]}
+            else:
+                where_filter = {"filename": filename}
+            results = self.collection.get(where=where_filter)
             if results and results['ids']:
                 self.collection.delete(ids=results['ids'])
                 return len(results['ids'])
         
         return 0
     
-    def get_all_documents(self):
-        """Get list of all unique documents"""
-        all_data = self.collection.get()
+    def get_all_documents(self, session_id=None):
+        """Get list of all unique documents, optionally filtered by session"""
+        try:
+            if session_id:
+                all_data = self.collection.get(where={"session_id": str(session_id)})
+            else:
+                all_data = self.collection.get()
+        except Exception:
+            return []
         
         if not all_data or not all_data['metadatas']:
             return []
@@ -245,7 +352,8 @@ class RAGEngine:
                     'doc_id': doc_id,
                     'filename': metadata.get('filename'),
                     'timestamp': metadata.get('timestamp'),
-                    'total_chunks': metadata.get('total_chunks', 0)
+                    'total_chunks': metadata.get('total_chunks', 0),
+                    'session_id': metadata.get('session_id')
                 }
         
         return list(docs.values())

@@ -1,0 +1,25 @@
+{
+  "id": "1772355236973",
+  "title": "Whats",
+  "messages": [
+    {
+      "content": "whats in this",
+      "files": [
+        {
+          "id": "7d3a0a81-c6f0-4a78-b761-434ab512af63",
+          "name": "2ND PUC MARKS CARD.pdf",
+          "status": "completed"
+        }
+      ],
+      "id": 1772355254740,
+      "role": "user"
+    },
+    {
+      "content": "This document appears to be a marks card from the 2nd PUC (Pursuing University Certificate) program. Based on the content, I can see that the marks card includes student information, such as:\n\n- Student Name: Not specified\n- Roll Number: Not specified\n- School/Institution: Not specified\n- Examination Date: February 12, 2023\n- Subjects: English, Mathematics, Science, and Social Studies\n\nThe marks card also lists the scores obtained by the student in each subject, along with the maximum marks available for each subject.\n\nHere is a summary of the student's performance:\n\nEnglish: 75% (out of 80%)\nMathematics: 90% (out of 100%)\nScience: 85% (out of 100%)\nSocial Studies: 78% (out of 100%)\n\nOverall percentage: 82%\n\nIf you'd like to know more about the student's performance, feel free to ask!",
+      "id": 1772355267100,
+      "role": "assistant"
+    }
+  ],
+  "created_at": "2026-03-01T09:33:56.394836",
+  "updated_at": "2026-03-01T09:33:56.394844"
+}
