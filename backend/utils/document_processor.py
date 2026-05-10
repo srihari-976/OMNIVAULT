@@ -36,32 +36,54 @@ class DocumentProcessor:
           3. Upscale to at least 1500px wide (improves small-text recognition)
           4. Enhance contrast and apply light sharpening
           5. Convert to pure B&W (binarize) to remove noise
+        
+        Returns processed image, or original if any step fails
         """
-        # 1. Ensure RGB first (RGBA/P mode images need conversion)
-        if image.mode in ('RGBA', 'P', 'LA'):
-            image = image.convert('RGB')
+        try:
+            original_image = image
+            
+            # 1. Ensure RGB first (RGBA/P mode images need conversion)
+            if image.mode in ('RGBA', 'P', 'LA'):
+                image = image.convert('RGB')
 
-        # 2. Grayscale
-        image = image.convert('L')
+            # 2. Grayscale
+            image = image.convert('L')
 
-        # 3. Upscale if too small — Tesseract needs ~300 DPI; target min 1500px wide
-        min_width = 1500
-        if image.width < min_width:
-            scale = min_width / image.width
-            new_size = (int(image.width * scale), int(image.height * scale))
-            image = image.resize(new_size, Image.LANCZOS)
+            # 3. Upscale if too small — Tesseract needs ~300 DPI; target min 1500px wide
+            min_width = 1500
+            if image.width < min_width:
+                scale = min_width / image.width
+                new_size = (int(image.width * scale), int(image.height * scale))
+                # Cap maximum upscaling to prevent memory issues
+                if new_size[0] > 10000 or new_size[1] > 10000:
+                    print(f"⚠️  Image upscaling capped to prevent memory issues")
+                    new_size = (min(new_size[0], 8000), min(new_size[1], 8000))
+                image = image.resize(new_size, Image.LANCZOS)
 
-        # 4. Enhance contrast
-        enhancer = ImageEnhance.Contrast(image)
-        image = enhancer.enhance(2.0)
+            # 4. Enhance contrast
+            try:
+                enhancer = ImageEnhance.Contrast(image)
+                image = enhancer.enhance(2.0)
+            except Exception as e:
+                print(f"⚠️  Contrast enhancement failed: {e}")
 
-        # 5. Sharpen
-        image = image.filter(ImageFilter.SHARPEN)
+            # 5. Sharpen
+            try:
+                image = image.filter(ImageFilter.SHARPEN)
+            except Exception as e:
+                print(f"⚠️  Sharpening failed: {e}")
 
-        # 6. Binarize (threshold to pure black/white)
-        image = image.point(lambda x: 0 if x < 140 else 255, '1').convert('L')
+            # 6. Binarize (threshold to pure black/white)
+            try:
+                image = image.point(lambda x: 0 if x < 140 else 255, '1').convert('L')
+            except Exception as e:
+                print(f"⚠️  Binarization failed, using grayscale: {e}")
+                # Fallback to grayscale if binarization fails
 
-        return image
+            return image
+        except Exception as e:
+            print(f"⚠️  Image preprocessing failed, returning original: {e}")
+            return original_image
 
     # -------------------------------------------------------------------------
     # Extractors
@@ -74,6 +96,7 @@ class DocumentProcessor:
         For each page that has no selectable text (scanned pages), falls back to
         rendering the page as a high-res image and running Tesseract OCR on it.
         """
+        doc = None
         try:
             text_parts = []
             doc = fitz.open(file_path)
@@ -106,8 +129,6 @@ class DocumentProcessor:
                 if page_text:
                     text_parts.append(f"[Page {page_num + 1} of {total_pages}]\n{page_text}")
 
-            doc.close()
-
             if ocr_pages:
                 print(f"    🔍 OCR applied to {ocr_pages} scanned page(s)")
 
@@ -116,6 +137,13 @@ class DocumentProcessor:
         except Exception as e:
             print(f"Error extracting text from PDF: {e}")
             return ""
+        finally:
+            # Ensure document is properly closed
+            if doc is not None:
+                try:
+                    doc.close()
+                except Exception:
+                    pass
 
     @staticmethod
     def extract_text_from_docx(file_path):
@@ -159,6 +187,8 @@ class DocumentProcessor:
           - Low-resolution images
           - Images with coloured / noisy backgrounds
         """
+        image = None
+        processed = None
         try:
             image = Image.open(file_path)
             processed = DocumentProcessor.preprocess_image_for_ocr(image)
@@ -189,6 +219,18 @@ class DocumentProcessor:
         except Exception as e:
             print(f"Error extracting text from image: {e}")
             return f"[Image file: {os.path.basename(file_path)} — OCR error: {e}]"
+        finally:
+            # Properly close image resources to prevent memory leaks
+            if image is not None:
+                try:
+                    image.close()
+                except Exception:
+                    pass
+            if processed is not None:
+                try:
+                    processed.close()
+                except Exception:
+                    pass
 
     @staticmethod
     def extract_text_from_markdown(file_path):

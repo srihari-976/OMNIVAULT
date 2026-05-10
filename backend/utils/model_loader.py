@@ -38,12 +38,18 @@ class ModelManager:
     def _get_gpu_info(self):
         """Get GPU information"""
         if self.device == "cuda":
-            return {
-                "available": True,
-                "name": torch.cuda.get_device_name(0),
-                "memory_total": torch.cuda.get_device_properties(0).total_memory / 1e9,
-                "cuda_version": torch.version.cuda
-            }
+            try:
+                return {
+                    "available": True,
+                    "name": torch.cuda.get_device_name(0),
+                    "memory_total": torch.cuda.get_device_properties(0).total_memory / 1e9,
+                    "memory_reserved": torch.cuda.memory_reserved(0) / 1e9,
+                    "memory_allocated": torch.cuda.memory_allocated(0) / 1e9,
+                    "cuda_version": torch.version.cuda
+                }
+            except Exception as e:
+                print(f"⚠️  Error getting GPU info: {e}")
+                return {"available": False, "cuda_version": torch.version.cuda}
         return {
             "available": False,
             "name": "CPU",

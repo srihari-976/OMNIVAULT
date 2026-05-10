@@ -60,7 +60,8 @@ class RAGEngine:
         try:
             collection = self.client.get_collection(name=Config.COLLECTION_NAME)
             print(f"✓ Using existing collection: {Config.COLLECTION_NAME}")
-        except:
+        except Exception as e:
+            print(f"Collection not found ({str(e)}), creating new one...")
             collection = self.client.create_collection(
                 name=Config.COLLECTION_NAME,
                 metadata={"description": "Lumina RAG document collection"}
