@@ -6,7 +6,13 @@ load_dotenv()
 class Config:
     # Model Configuration
     MODEL_NAME = os.getenv("MODEL_NAME", "meta-llama/Llama-3.2-3B-Instruct")
-    HUGGINGFACE_TOKEN = os.getenv("HUGGINGFACE_TOKEN", "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")
+    # IMPORTANT: HuggingFace token should only come from environment variables
+    # Never hardcode tokens in source code!
+    HUGGINGFACE_TOKEN = os.getenv("HUGGINGFACE_TOKEN", "")
+    if not HUGGINGFACE_TOKEN:
+        print("⚠️  WARNING: HUGGINGFACE_TOKEN not set in environment variables")
+        print("    Set it with: export HUGGINGFACE_TOKEN=your_token_here")
+        print("    Or in a .env file in the backend directory")
     
     # Model Loading Settings
     USE_4BIT_QUANTIZATION = True

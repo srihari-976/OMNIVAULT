@@ -38,11 +38,69 @@ rag_engine = None
 model_loaded = False
 chat_storage = None
 web_search = None
+worker_thread = None  # Track worker thread for graceful shutdown
+shutdown_event = threading.Event()  # Signal to stop worker
 
 # Processing queue and status tracking
 processing_queue = queue.Queue()
 processing_status = {}  # {file_id: {status, message, progress, etc.}}
 processing_lock = threading.Lock()
+
+# ============================================================================
+# UTILITY FUNCTIONS FOR INPUT VALIDATION AND SAFETY
+# ============================================================================
+
+def sanitize_input(text, max_length=10000):
+    """Sanitize and validate user input"""
+    if not isinstance(text, str):
+        return ""
+    # Truncate excessive input
+    text = text[:max_length].strip()
+    # Remove potentially harmful characters
+    return text
+
+def validate_json(data, required_fields=None):
+    """Validate JSON request data"""
+    if not isinstance(data, dict):
+        return False, "Invalid request format"
+    
+    if required_fields:
+        for field in required_fields:
+            if field not in data or not data[field]:
+                return False, f"Missing required field: {field}"
+    
+    return True, None
+
+def handle_error(error, error_type="Server error", is_verbose=False):
+    """
+    Handle errors and return safe response to client
+    
+    Args:
+        error: The exception or error message
+        error_type: Type of error for user (default: "Server error")
+        is_verbose: If True, include error details (only for development)
+    
+    Returns:
+        Tuple of (error_dict, status_code)
+    """
+    import sys
+    error_msg = str(error)
+    
+    # Log full error internally
+    print(f"❌ {error_type}: {error_msg}")
+    traceback.print_exc()
+    
+    # Return safe error to client
+    response = {
+        'error': error_type,
+        'message': 'An unexpected error occurred. Please try again later.'
+    }
+    
+    # Only include details in development mode
+    if is_verbose or getattr(Config, 'FLASK_DEBUG', False):
+        response['details'] = error_msg
+    
+    return response, 500
 
 def initialize_backend():
     """Initialize model and RAG engine in background thread"""
@@ -84,10 +142,14 @@ def process_documents_worker():
     """Background worker to process documents from the queue"""
     print("📋 Document processing worker started")
     
-    while True:
+    while not shutdown_event.is_set():
         try:
-            # Get next document from queue (blocking)
-            task = processing_queue.get()
+            # Get next document from queue (blocking with timeout)
+            try:
+                task = processing_queue.get(timeout=1)
+            except queue.Empty:
+                # Timeout waiting for task - check shutdown event again
+                continue
             
             if task is None:  # Poison pill to stop worker
                 break
@@ -175,7 +237,9 @@ def process_documents_worker():
             print(f"❌ Worker error: {str(e)}")
             traceback.print_exc()
             time.sleep(1)  # Prevent tight loop on errors
-
+    
+    # Graceful shutdown
+    print("🛑 Document processing worker shutting down...")
 
 
 # ============================================================================
@@ -208,6 +272,15 @@ def health():
     }), 200
 
 
+@app.route('/shutdown', methods=['POST'])
+def shutdown():
+    """Gracefully shutdown the server"""
+    global shutdown_event
+    print("🛑 Shutdown request received...")
+    shutdown_event.set()  # Signal worker to stop
+    return jsonify({'message': 'Server shutting down...'}), 200
+
+
 @app.route('/api/chat', methods=['POST'])
 def chat():
     """
@@ -228,12 +301,18 @@ def chat():
             }), 503
         
         data = request.get_json()
-        message = data.get('message', '')
+        if not data:
+            return jsonify({'error': 'Invalid request format'}), 400
+        
+        message = sanitize_input(data.get('message', ''), max_length=5000)
         mode = data.get('mode', 'chat')
+        if mode not in ['chat', 'summarize', 'deep-research', 'coding']:
+            mode = 'chat'  # Default to chat if invalid mode
+        
         use_rag = data.get('use_rag', True)
         session_id = data.get('session_id', None)
-        conversation_history = data.get('conversation_history', [])
-        attached_files = data.get('attached_files', [])  # Files attached to this query
+        conversation_history = data.get('conversation_history', []) or []
+        attached_files = data.get('attached_files', []) or []  # Files attached to this query
         
         if not message:
             return jsonify({'error': 'Message is required'}), 400
@@ -339,9 +418,8 @@ def chat():
         }), 200
         
     except Exception as e:
-        print(f"❌ Error in chat endpoint: {str(e)}")
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
+        error_response, status_code = handle_error(e, "Chat processing error")
+        return jsonify(error_response), status_code
 
 
 @app.route('/api/summarize', methods=['POST'])
@@ -359,7 +437,10 @@ def summarize():
             return jsonify({'error': 'Model not loaded'}), 503
         
         data = request.get_json()
-        text = data.get('text', '')
+        if not data:
+            return jsonify({'error': 'Invalid request format'}), 400
+        
+        text = sanitize_input(data.get('text', ''), max_length=50000)
         
         if not text:
             return jsonify({'error': 'Text is required'}), 400
@@ -380,8 +461,8 @@ def summarize():
         }), 200
         
     except Exception as e:
-        print(f"❌ Error in summarize endpoint: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        error_response, status_code = handle_error(e, "Summarization error")
+        return jsonify(error_response), status_code
 
 
 @app.route('/api/deep-research', methods=['POST'])
@@ -399,7 +480,10 @@ def deep_research():
             return jsonify({'error': 'Model not loaded'}), 503
         
         data = request.get_json()
-        query = data.get('query', '')
+        if not data:
+            return jsonify({'error': 'Invalid request format'}), 400
+        
+        query = sanitize_input(data.get('query', ''), max_length=5000)
         session_id = data.get('session_id', None)
         
         if not query:
@@ -464,8 +548,8 @@ def deep_research():
         }), 200
         
     except Exception as e:
-        print(f"❌ Error in deep-research endpoint: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        error_response, status_code = handle_error(e, "Research synthesis error")
+        return jsonify(error_response), status_code
 
 
 @app.route('/api/code-assist', methods=['POST'])
@@ -484,7 +568,10 @@ def code_assist():
             return jsonify({'error': 'Model not loaded'}), 503
         
         data = request.get_json()
-        message = data.get('message', '')
+        if not data:
+            return jsonify({'error': 'Invalid request format'}), 400
+        
+        message = sanitize_input(data.get('message', ''), max_length=5000)
         
         if not message:
             return jsonify({'error': 'Message is required'}), 400
@@ -531,8 +618,14 @@ def upload_file():
         file_ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
         if file_ext not in Config.ALLOWED_EXTENSIONS:
             return jsonify({
-                'error': f'File type not supported. Allowed: {", ".join(Config.ALLOWED_EXTENSIONS)}'
+                'error': f'File type not supported. Allowed: {", ".join(sorted(Config.ALLOWED_EXTENSIONS))}'
             }), 400
+        
+        # Validate filename — prevent directory traversal
+        import os.path
+        safe_basename = os.path.basename(file.filename)
+        if safe_basename != file.filename or '..' in file.filename:
+            return jsonify({'error': 'Invalid filename'}), 400
         
         # Generate unique file ID
         file_id = str(uuid.uuid4())
@@ -540,28 +633,40 @@ def upload_file():
         # Save file immediately — into session subdirectory if session_id provided
         filename = file.filename
         # Add timestamp to filename to avoid collisions
-        base_name, ext = os.path.splitext(filename)
+        base_name, ext = os.path.splitext(safe_basename)
         safe_filename = f"{base_name}_{int(time.time())}{ext}"
         
         if session_id:
+            # Validate session_id format
+            if not str(session_id).replace('-', '').replace('_', '').isalnum():
+                return jsonify({'error': 'Invalid session ID'}), 400
             session_upload_dir = os.path.join(Config.UPLOAD_DIR, str(session_id))
             os.makedirs(session_upload_dir, exist_ok=True)
             filepath = os.path.join(session_upload_dir, safe_filename)
         else:
             filepath = os.path.join(Config.UPLOAD_DIR, safe_filename)
         
+        # Validate filepath is within upload directory
+        real_upload_dir = os.path.realpath(Config.UPLOAD_DIR)
+        real_filepath = os.path.realpath(filepath)
+        if not real_filepath.startswith(real_upload_dir):
+            return jsonify({'error': 'Invalid file path'}), 400
+        
         file.save(filepath)
         print(f"✓ File saved: {safe_filename} (session: {session_id or 'global'})")
         
-        # Enforce soft upload size limit to prevent hanging WSL/CPU during embedding
+        # Check file size after saving
         file_size_mb = os.path.getsize(filepath) / (1024 * 1024)
-        max_mb = getattr(Config, 'MAX_UPLOAD_SIZE_MB', 10)
+        max_mb = getattr(Config, 'MAX_UPLOAD_SIZE_MB', 50)
         if file_size_mb > max_mb:
-            os.remove(filepath)
+            try:
+                os.remove(filepath)
+            except Exception as cleanup_err:
+                print(f"Warning: Could not delete oversized file: {cleanup_err}")
             return jsonify({
                 'error': f'File too large ({file_size_mb:.1f} MB). Maximum allowed size is {max_mb} MB. '
                          f'Please split the document into smaller parts.'
-            }), 400
+            }), 413  # Use 413 Payload Too Large HTTP status
         
         # Set initial status
         with processing_lock:
@@ -597,9 +702,8 @@ def upload_file():
         }), 200
         
     except Exception as e:
-        print(f"❌ Error in upload endpoint: {str(e)}")
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
+        error_response, status_code = handle_error(e, "File upload error")
+        return jsonify(error_response), status_code
 
 
 @app.route('/api/upload/status/<file_id>', methods=['GET'])
